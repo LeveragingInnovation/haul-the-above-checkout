@@ -3,8 +3,8 @@ export interface JotformSubmission {
   customerName: string
   customerEmail: string
   customerPhone: string
-  pickupDate: Date
-  returnDate: Date
+  pickupDate: string  // YYYY-MM-DD — always a plain string, never a Date object
+  returnDate: string  // YYYY-MM-DD — always a plain string, never a Date object
 }
 
 interface DateTimeField {
@@ -13,40 +13,54 @@ interface DateTimeField {
   year?: string
   hour?: string
   min?: string
+  datetime?: string
 }
 
-function parseJotformDate(field: DateTimeField): Date {
+/**
+ * Parse a Jotform datetime answer into a YYYY-MM-DD string.
+ * Jotform returns: { day: "07", month: "07", year: "2026", hour: "07", min: "00", datetime: "2026-07-07 07:00:00" }
+ * We read day/month/year directly — no Date object, no timezone conversion possible.
+ */
+function parseJotformDate(field: DateTimeField): string {
   const month = parseInt(field.month || '1', 10)
   const day = parseInt(field.day || '1', 10)
   const year = parseInt(field.year || '2026', 10)
-  return new Date(year, month - 1, day)
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-// Test fixtures
+// Test fixtures — keyed by submission ID
 const TEST_SUBMISSIONS: Record<string, JotformSubmission> = {
   'test-1day': {
     submissionId: 'test-1day',
     customerName: 'Test Customer',
     customerEmail: 'test@example.com',
     customerPhone: '(555) 555-5555',
-    pickupDate: new Date(2026, 6, 6), // July 6, 2026
-    returnDate: new Date(2026, 6, 6), // July 6, 2026
+    pickupDate: '2026-07-06',
+    returnDate: '2026-07-06',
   },
   'test-2day': {
     submissionId: 'test-2day',
     customerName: 'Test Customer',
     customerEmail: 'test@example.com',
     customerPhone: '(555) 555-5555',
-    pickupDate: new Date(2026, 6, 6), // July 6, 2026
-    returnDate: new Date(2026, 6, 7), // July 7, 2026
+    pickupDate: '2026-07-06',
+    returnDate: '2026-07-07',
   },
   'test-8day': {
     submissionId: 'test-8day',
     customerName: 'Test Customer',
     customerEmail: 'test@example.com',
     customerPhone: '(555) 555-5555',
-    pickupDate: new Date(2026, 6, 6),  // July 6, 2026
-    returnDate: new Date(2026, 6, 13), // July 13, 2026
+    pickupDate: '2026-07-06',
+    returnDate: '2026-07-13',
+  },
+  'test-4day': {
+    submissionId: 'test-4day',
+    customerName: 'Test Customer',
+    customerEmail: 'test@example.com',
+    customerPhone: '(555) 555-5555',
+    pickupDate: '2026-07-07',
+    returnDate: '2026-07-10',
   },
 }
 
@@ -81,12 +95,12 @@ export async function fetchJotformSubmission(submissionId: string): Promise<Jotf
     throw new Error('No answers found in Jotform submission')
   }
 
-  // Parse fields - Jotform field structure
-  const nameField = answers.q14_renterName
-  const emailField = answers.q19_customerEmail
-  const phoneField = answers.q18_customerPhone
-  const pickupField = answers.q11_pickupDateTime
-  const returnField = answers.q12_returnDateTime
+  // Jotform /submission/{id} returns answers keyed by numeric question ID
+  const nameField = answers['14']
+  const emailField = answers['19']
+  const phoneField = answers['18']
+  const pickupField = answers['11']
+  const returnField = answers['12']
 
   const customerName = nameField?.answer
     ? (typeof nameField.answer === 'object'
@@ -101,6 +115,7 @@ export async function fetchJotformSubmission(submissionId: string): Promise<Jotf
         : String(phoneField.answer))
     : ''
 
+  // Parse the date fields — returns YYYY-MM-DD strings, no Date objects
   const pickupDate = parseJotformDate(pickupField?.answer || {})
   const returnDate = parseJotformDate(returnField?.answer || {})
 

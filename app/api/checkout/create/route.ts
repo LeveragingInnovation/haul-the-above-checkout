@@ -12,18 +12,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'submissionId is required' }, { status: 400 })
     }
 
-    // Fetch Jotform submission
+    // Fetch Jotform submission — dates are YYYY-MM-DD strings
     const submission = await fetchJotformSubmission(submissionId)
 
-    // Calculate rental fees
+    // Calculate rental fees — accepts strings, uses Date.UTC internally
     const calc = calculateRental(submission.pickupDate, submission.returnDate)
 
-    const pickupStr = submission.pickupDate.toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric'
-    })
-    const returnStr = submission.returnDate.toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric'
-    })
+    // Store dates as YYYY-MM-DD strings in Stripe metadata — no conversion ever happens
+    const pickupStr = submission.pickupDate  // e.g. "2026-07-07"
+    const returnStr = submission.returnDate  // e.g. "2026-07-10"
 
     // Create Stripe PaymentIntent with manual capture
     const paymentIntent = await stripe.paymentIntents.create({
